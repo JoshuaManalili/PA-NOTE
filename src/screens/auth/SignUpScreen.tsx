@@ -14,6 +14,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types';
 import FormInput from '../../components/FormInput';
 import PrimaryButton from '../../components/PrimaryButton';
+import { supabase } from '../../lib/supabase';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'SignUp'>;
 
@@ -25,20 +26,46 @@ export default function SignUpScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSignUp = () => {
+  const handleSignUp = async () => {
     if (!username.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
       Alert.alert('Missing fields', 'Please fill in all fields.');
+      return;
+    }
+    if (password.length < 6) {
+      Alert.alert('Weak password', 'Password must be at least 6 characters.');
       return;
     }
     if (password !== confirmPassword) {
       Alert.alert('Password mismatch', 'Passwords do not match.');
       return;
     }
+
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
-    }, 800);
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password: password.trim(),
+      options: {
+        data: { username: username.trim() },
+      },
+    });
+    setLoading(false);
+
+    if (error) {
+      Alert.alert('Sign Up Failed', error.message);
+      return;
+    }
+
+    if (data.session) {
+      // ✅ Email confirmation is OFF in Supabase — user is logged in directly.
+      // AppNavigator detects the session and redirects automatically.
+    } else {
+      // ✅ Email confirmation is ON — guide user to check their email.
+      Alert.alert(
+        'Check your email 📧',
+        'We sent a confirmation link to ' + email.trim() + '. Verify your email, then sign in.',
+        [{ text: 'Go to Sign In', onPress: () => navigation.navigate('SignIn') }]
+      );
+    }
   };
 
   return (
@@ -71,7 +98,7 @@ export default function SignUpScreen() {
             autoCorrect={false}
           />
           <FormInput
-            placeholder="Password"
+            placeholder="Password (min. 6 characters)"
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -84,7 +111,7 @@ export default function SignUpScreen() {
           />
 
           <PrimaryButton
-            label="Login"
+            label="Create Account"
             onPress={handleSignUp}
             loading={loading}
             style={styles.signupBtn}

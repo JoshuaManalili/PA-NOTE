@@ -10,6 +10,7 @@ import {
   SafeAreaView,
   Platform,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -24,7 +25,8 @@ const MIN_SUBJECT_LENGTH = 100;
 
 export default function LandingScreen() {
   const navigation = useNavigation<Nav>();
-  const { notes, addNote } = useAppContext();
+  const { notes, addNote, loading } = useAppContext();
+  const [isAdding, setIsAdding] = useState(false);
 
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('');
@@ -33,7 +35,7 @@ export default function LandingScreen() {
   const [activeTab, setActiveTab] = useState<'notes' | 'quiz'>('notes');
   const [menuVisible, setMenuVisible] = useState(false);
 
-  const handleAddNote = () => {
+  const handleAddNote = async () => {
     if (!title.trim()) {
       Alert.alert('Title required', 'Please enter a title for your note.');
       return;
@@ -43,15 +45,21 @@ export default function LandingScreen() {
       return;
     }
     if (subject.trim().length < MIN_SUBJECT_LENGTH) {
-      Alert.alert(
-        'Subject too short',
-        `Subject must be at least ${MIN_SUBJECT_LENGTH} characters. Currently: ${subject.trim().length}`
-      );
+      Alert.alert('Subject too short', `Note must be at least ${MIN_SUBJECT_LENGTH} characters to generate a quiz.`);
       return;
     }
-    addNote(title.trim(), subject.trim());
-    setTitle('');
-    setSubject('');
+
+    setIsAdding(true);
+    try {
+      await addNote(title.trim(), subject.trim());
+      setTitle('');
+      setSubject('');
+    } catch (error) {
+      console.error('Add note error:', error);
+      Alert.alert('Error', 'Failed to add note. Please try again.');
+    } finally {
+      setIsAdding(false);
+    }
   };
 
   const handleMicPress = () => {
@@ -126,8 +134,8 @@ export default function LandingScreen() {
                   isRecording
                     ? '🎙 Recording... speak now'
                     : transcribing
-                    ? '⏳ Transcribing...'
-                    : subject
+                      ? '⏳ Transcribing...'
+                      : subject
                 }
                 onChangeText={setSubject}
                 editable={!isRecording && !transcribing}
@@ -159,8 +167,16 @@ export default function LandingScreen() {
               <Text style={[styles.charCount, { color: charColor }]}>
                 {charCount}/{MIN_SUBJECT_LENGTH} chars
               </Text>
-              <TouchableOpacity style={styles.doneBtn} onPress={handleAddNote}>
-                <Text style={styles.doneBtnText}>Done</Text>
+              <TouchableOpacity
+                style={[styles.doneBtn, isAdding && { opacity: 0.7 }]}
+                onPress={handleAddNote}
+                disabled={isAdding}
+              >
+                {isAdding ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.doneBtnText}>Done</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -169,24 +185,33 @@ export default function LandingScreen() {
 
       {/* Scrollable Notes List */}
       {activeTab === 'notes' && (
-        <FlatList
-          data={notes}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <NoteCard
-              note={item}
-              onPress={() => navigation.navigate('NoteDetail', { note: item })}
+        <>
+          {loading ? (
+            <View style={styles.center}>
+              <ActivityIndicator size="large" color="#0B4A8E" />
+              <Text style={styles.loadingText}>Loading your notes...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={notes}
+              keyExtractor={item => item.id}
+              contentContainerStyle={styles.listContent}
+              renderItem={({ item }) => (
+                <NoteCard
+                  note={item}
+                  onPress={() => navigation.navigate('NoteDetail', { note: item })}
+                />
+              )}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyIcon}>📝</Text>
+                  <Text style={styles.emptyText}>No notes yet.</Text>
+                  <Text style={styles.emptySubText}>Add your first note above!</Text>
+                </View>
+              }
             />
           )}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>📝</Text>
-              <Text style={styles.emptyText}>No notes yet.</Text>
-              <Text style={styles.emptySubText}>Add your first note above!</Text>
-            </View>
-          }
-        />
+        </>
       )}
 
       {/* Bottom Toolbar */}
@@ -211,7 +236,7 @@ export default function LandingScreen() {
       <HamburgerMenu
         visible={menuVisible}
         onClose={() => setMenuVisible(false)}
-        onNavigate={(screen) => navigation.navigate(screen as keyof RootStackParamList)}
+        onNavigate={(screen) => navigation.navigate(screen as any)}
       />
     </SafeAreaView>
   );
@@ -394,5 +419,15 @@ const styles = StyleSheet.create({
   },
   toolbarIcon: {
     fontSize: 22,
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#0B4A8E',
+    fontWeight: '600',
   },
 });

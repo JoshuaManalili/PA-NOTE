@@ -6,10 +6,9 @@ import {
   TouchableOpacity,
   Modal,
   TouchableWithoutFeedback,
+  Alert,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../types';
+import { supabase } from '../lib/supabase';
 
 interface HamburgerMenuProps {
   visible: boolean;
@@ -18,11 +17,13 @@ interface HamburgerMenuProps {
 }
 
 export default function HamburgerMenu({ visible, onClose, onNavigate }: HamburgerMenuProps) {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-
-  const handleLogout = () => {
+  const handleLogout = async () => {
     onClose();
-    navigation.reset({ index: 0, routes: [{ name: 'SignIn' }] });
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      Alert.alert('Logout failed', error.message);
+    }
+    // AppNavigator detects session === null and switches to SignIn automatically
   };
 
   const menuItems = [

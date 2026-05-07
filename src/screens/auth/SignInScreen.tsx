@@ -14,6 +14,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types';
 import FormInput from '../../components/FormInput';
 import PrimaryButton from '../../components/PrimaryButton';
+import { supabase } from '../../lib/supabase';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'SignIn'>;
 
@@ -23,16 +24,24 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
       Alert.alert('Missing fields', 'Please enter your email and password.');
       return;
     }
+
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
-    }, 800);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password: password.trim(),
+    });
+    setLoading(false);
+
+    if (error) {
+      Alert.alert('Login Failed', error.message);
+    }
+    // ✅ No navigation.reset() needed — AppNavigator detects the session
+    // and automatically switches to the main app screens.
   };
 
   return (
@@ -74,7 +83,9 @@ export default function SignInScreen() {
           />
 
           <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
-            <Text style={styles.signupLink}>Don't have an account? <Text style={styles.linkBold}>Sign up</Text></Text>
+            <Text style={styles.signupLink}>
+              Don't have an account? <Text style={styles.linkBold}>Sign up</Text>
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -120,15 +131,9 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 4,
   },
-  forgotText: {
-    fontSize: 12,
-    color: '#0B4A8E',
-    textAlign: 'center',
-    marginBottom: 16,
-    textDecorationLine: 'underline',
-  },
   loginBtn: {
     marginBottom: 12,
+    marginTop: 8,
   },
   signupLink: {
     textAlign: 'center',
